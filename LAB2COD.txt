@@ -1,0 +1,157 @@
+#!/usr/bin/env/ python3
+
+
+import socket
+
+from threading import *
+
+import re
+
+
+HOST = 'me.utm.md'
+
+PORT = 80
+
+
+def make_socket_connection(H, P):
+
+data = b''
+
+server_address = (H, P)
+
+message = b'GET / HTTP/1.1\r\n'
+
+message += f'Host: {H}:{P}\r\n'.encode('utf-8')
+
+message += b'Connection: close\r\n'
+
+message += b'Content-Language: en-US\r\n'
+
+message += b'Content-Type: text/html; charset=UTF-8\r\n'
+ 
+message += b'Accept-Encoding: gzip, compress, br\r\n'
+
+message += b'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.106 Safari/537.36 OPR/38.0.2220.4\r\n'
+
+message += b'\r\n'
+
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+
+s.connect(server_address)
+
+s.sendall(message)
+
+while True:
+
+buf = s.recv(1024)
+
+if not buf:
+
+break
+
+data += buf
+
+s.close()
+
+return data.decode()
+
+
+def exctract_images(d):
+
+imgregex = r'<img[^<>]+src=["\']([^"\'<>]+\.(?:gif|png|jpe?g))["\']' images = re.findall(imgregex, d)
+
+
+return images
+
+
+def download_img(WebHost, images, min, max):
+
+
+server_address = (WebHost, PORT)
+
+
+for i in range(min, max):
+
+data = b''
+
+#Check for different host
+
+if 'http' in images[i]:
+
+WebHost, file = images[i].split("/files/")
+
+h = WebHost.split("://")
+
+WebHost = h[1]
+
+images[i] = "files/" + file
+
+else:
+
+WebHost = HOST
+
+
+message = f'GET /{images[i]} HTTP/1.1\r\n'.encode('utf-8')
+
+message += f'Host: {WebHost}:{PORT}\r\n'.encode('utf-8')
+ 
+message += b'\r\n'
+
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+
+s.connect(server_address)
+
+s.sendall(message)
+
+
+while True:
+
+buf = s.recv(1024)
+
+if not buf:
+
+break
+
+data += buf
+
+
+s.close()
+
+
+img_content = re.findall(b'\r\n\r\n(.*)', data, re.S)[0] with open(str(i) + '.jpg', 'wb') as f:
+
+f.write(img_content)
+
+
+print("Image ", i, " : ", images[i], "\tSUCCESS!")
+
+
+def main():
+
+data = make_socket_connection(HOST, PORT)
+
+imgs = exctract_images(data)
+
+
+t1 = Thread(target=download_img, args=(HOST, imgs, 0, 7, ))
+
+t1.start()
+
+t2 = Thread(target=download_img, args=(HOST, imgs, 7, 14, ))
+
+t2.start()
+
+t3 = Thread(target=download_img, args=(HOST, imgs, 14, 21, ))
+
+t3.start()
+
+t4 = Thread(target=download_img, args=(HOST, imgs, 21, 28, ))
+
+t4.start()
+
+
+if __name__ == "__main__":
+
+main()

@@ -1,0 +1,115 @@
+SERVER
+
+
+import threading
+
+import socket
+
+import sys
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+connections = []
+
+sock.bind(('0.0.0.0', 10001))
+
+sock.listen(1)
+
+def handler(c, a):
+
+while True:
+
+data = c.recv(1024)
+
+for connection in connections:
+
+connection.send(data)
+
+if not data:
+
+break
+
+def runServer():
+
+while True:
+
+conn, addr = sock.accept()
+
+print("A new client connected, op port = ", addr[1])
+
+t = threading.Thread(target=handler, args=(conn, addr))
+
+t.daemon = True
+
+t.start()
+ 
+connections.append(conn)
+
+print(connections)
+
+if __name__ == "__main__":
+
+try:
+
+runServer()
+
+except KeyboardInterrupt:
+
+print("Server stopped!")
+
+sock.close()
+
+sys.exit()
+
+CLIENT
+
+
+import threading
+
+import socket
+
+import sys
+
+addr = '127.0.0.1'
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+sock.connect((addr, 10001))
+
+def sendMess():
+
+while True:
+
+sock.send(bytes(input(''), 'utf-8'))
+
+def client():
+
+t = threading.Thread(target=sendMess)
+
+t.daemon = True
+
+t.start()
+
+while True:
+
+data = sock.recv(1024)
+
+if not data:
+
+break
+
+print(str(data, 'utf-8'))
+
+if __name__ == "__main__":
+
+try:
+
+client()
+
+except KeyboardInterrupt:
+
+print("Disconnected.")
+
+sock.close()
+
+sys.close()

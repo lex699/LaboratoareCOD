@@ -1,0 +1,421 @@
+from email.mime.multipart import MIMEMultipart
+
+from email.mime.base import MIMEBase
+
+from email.mime.text import MIMEText
+
+from tkinter import filedialog as fd
+
+from base64 import b64decode
+
+import tkinter as tk
+
+import smtplib
+
+import imaplib
+
+import email
+
+import ssl
+
+import os
+
+filename = ''
+
+
+def add_diacritics(text):
+
+text = text.replace("=C4=82", "Ă")
+
+text = text.replace("=C4=83", "ă")
+
+text = text.replace("=C8=82", "Â")
+
+text = text.replace("=C8=83", "â")
+
+text = text.replace("=C8=8A", "Î")
+
+text = text.replace("=C8=8B", "î")
+
+text = text.replace("=C8=98", "Ș")
+
+text = text.replace("=C8=99", "ș")
+
+text = text.replace("=C8=9A", "Ț")
+
+text = text.replace("=C8=9B", "ț")
+
+text = text.replace("=?UTF-8?Q?", "")
+
+text = text.replace("?=", "")
+
+text = text.replace("=2C", ",")
+
+text = text.replace("_", " ")
+
+return text
+ 
+def callback():
+
+global filename
+
+filename = fd.askopenfilename() # Path to file
+
+print(filename)
+
+
+def sent_email():
+
+smpt_server = 'smtp.gmail.com'
+
+port = 587 # for starttls
+
+sender_email = str(email_entry.get())
+
+sender_pass = str(pass_entry.get())
+
+receiver_email = str(to_entry.get())
+
+message = MIMEMultipart('alternative')
+
+message['Subject'] = str(subject_entry.get())
+
+message['From'] = str(from_entry.get())
+
+message['To'] = receiver_email
+
+text = str(text_entry.get("1.0", tk.END))
+
+message.attach(MIMEText(text, 'plain'))
+
+global filename
+
+print(filename)
+
+if filename:
+
+#	Verify file size if not exceed 2MB try:
+
+file_size = os.path.getsize(filename) if file_size > 2 * 1048576: # 2 MB
+
+print("File too large!")
+
+login_error_label = tk.Label(root, text="File >2MB too large!", bg=bg_color, fg='#bd0909',
+
+font=(base_font, 16))
+
+login_error_label.grid(column=0, row=1, columnspan=6)
+
+return 0
+
+sent_email()
+
+except OSError:
+
+login_error_label = tk.Label(root, text="File not found!!!", bg=bg_color, fg='#bd0909', font=(base_font, 16))
+
+login_error_label.grid(column=0, row=1, columnspan=6)
+
+print("File not found!!!")
+
+finally:
+
+pass
+
+# Open file in binary mode
+
+with open(filename, 'rb') as attachment:
+
+#	Add file as application/octet-stream
+
+#	Email client can usually download this automatically as attachment part = MIMEBase('application', 'octet-steam') part.set_payload(attachment.read())
+
+#	Encode file in ASCII chars to send
+
+email.encoders.encode_base64(part)
+
+#	Add headers as key/value pair to attachment part part.add_header(
+
+"content-Disposition", f'attachment; filename={filename}',
+
+)
+
+#	Add attachment to message message.attach(part)
+ 
+# Create a secure SSL context
+
+context = ssl.create_default_context()
+
+# Try to log in to server
+
+server = smtplib.SMTP(smpt_server, port)
+
+#	Sent the email try:
+
+server.ehlo()
+
+server.starttls(context=context) # To secure the connection server.ehlo()
+
+server.login(sender_email, sender_pass)
+
+server.sendmail(sender_email, receiver_email, message.as_string()) except Exception as e:
+
+#	Print every found error
+
+print(e)
+
+finally:
+
+server.quit()
+
+
+def read_emails():
+
+imap_server = 'imap.gmail.com'
+
+port = 993 # for imap server
+
+email_addr = str(email_entry.get())
+
+passwd = str(pass_entry.get())
+
+try:
+
+inbox = imaplib.IMAP4_SSL(imap_server, port)
+
+inbox.login(email_addr, passwd)
+
+inbox.select('inbox')
+
+# Success loging message
+
+login_error_label = tk.Label(root, text="Login with success!", bg=bg_color, fg='#1a9418', font=(base_font, 16))
+
+login_error_label.grid(column=0, row=1, columnspan=6)
+
+data = inbox.search(None, 'ALL')
+
+mail_IDs = data[1]
+
+ID_list = mail_IDs[0].split()
+
+first_email_ID = int(ID_list[0])
+
+latest_email_ID = int(ID_list[-1])
+
+for i in range(latest_email_ID, first_email_ID - 1, -1):
+
+data = inbox.fetch(str(i), '(RFC822)')
+
+for response_part in data:
+
+array = response_part[0]
+
+if isinstance(array, tuple):
+
+msg = email.message_from_bytes(array[1])
+
+# print("THE MSG= ", msg)
+
+email_from = msg['From']
+
+email_datestamp = msg['Date']
+
+email_subject = msg['Subject']
+
+email_content = "Nothing"
+
+#	Working. Don't touch if msg.is_multipart():
+
+for payload in msg.get_payload(): email_content = payload.get_payload()
+ 
+break
+
+else:
+
+email_content = msg.get_payload()
+
+email_text = str(b64decode(email_content), 'utf-8')
+
+email_subject, email_from = add_diacritics(email_subject), add_diacritics(email_from)
+
+inbox_textbox.insert(tk.END, 'From: ' + email_from + '\n')
+
+inbox_textbox.insert(tk.END, 'Date: ' + email_datestamp + '\n')
+
+inbox_textbox.insert(tk.END, 'Subject: ' + email_subject + '\n')
+
+inbox_textbox.insert(tk.END, 'Text: ' + email_text + '\n')
+
+inbox_textbox.insert(tk.END, '\n=============Next Message=============\n\n')
+
+print('From: ', email_from)
+
+print('Date: ', email_datestamp)
+
+print('Subject: ', email_subject)
+
+print('Text: ', email_text)
+
+except Exception as e:
+
+# Error loging message
+
+login_error_label = tk.Label(root, text="Email or Password are wrong!", bg=bg_color, fg='#bd0909', font=(base_font, 16))
+
+login_error_label.grid(column=0, row=1, columnspan=6)
+
+print(e)
+
+
+#	Window Size width = 900 height = 600
+
+#	Background-color bg_color = '#a8c779'
+
+#	Initiate main window root = tk.Tk()
+
+canvas = tk.Canvas(root, height=height, width=width, bg=bg_color) canvas.grid(columnspan=6, rowspan=9)
+
+#	Title
+
+title = 'eMail Client Parody'
+
+root.title(title)
+
+# Window icon
+
+photo = tk.PhotoImage(file='icon.png')
+
+root.iconphoto(False, photo)
+
+# Text Font
+
+base_font = 'Raleway'
+
+#	Main Window Widgets:
+
+#	Email Label & Entry
+
+email_label = tk.Label(root, text="EMail:", background=bg_color, font=base_font)
+
+email_label.grid(column=0, row=0)
+
+email_entry = tk.Entry(root, font=base_font, width=30)
+
+email_entry.grid(column=1, row=0, stick='w')
+
+# Password Label & Entry
+
+pass_label = tk.Label(root, text="Password:", background=bg_color, font=base_font)
+
+pass_label.grid(column=2, row=0)
+
+pass_entry = tk.Entry(root, show='*', font=base_font, width=20)
+
+pass_entry.grid(column=3, row=0, stick='w')
+ 
+# Hardcoded Email & Pass for loging in
+
+email_entry.insert(tk.END, 'trusted.real.adm1n@gmail.com')
+
+pass_entry.insert(tk.END, 'n1mda.laer.detsurt')
+
+# Login Button
+
+login_btn = tk.Button(root, text="Login", command=lambda: read_emails(), font=base_font)
+
+login_btn.grid(column=4, row=0, columnspan=2)
+
+#	A beatifull line line_height = 110
+
+canvas.create_line(0, line_height, width, line_height)
+
+#	=================== Send Email Part
+
+#	Part Title Label
+
+send_title_label = tk.Label(root, text="Send EMail", background=bg_color, font=(base_font, 20))
+
+send_title_label.grid(column=1, row=2, stick='w', padx=10)
+
+# From Label & Entry
+
+from_label = tk.Label(root, text="From:", background=bg_color, font=base_font)
+
+from_label.grid(column=0, row=3, stick='n')
+
+from_entry = tk.Entry(root, font=base_font, width=30)
+
+from_entry.grid(column=1, row=3, columnspan=2, stick='nw')
+
+# To Label & Entry
+
+to_label = tk.Label(root, text="To:", background=bg_color, font=base_font)
+
+to_label.grid(column=0, row=4, stick='n')
+
+to_entry = tk.Entry(root, font=base_font, width=30)
+
+to_entry.grid(column=1, row=4, columnspan=2, stick='nw')
+
+# Subject Label & Entry
+
+subject_label = tk.Label(root, text="Subject:", background=bg_color, font=base_font)
+
+subject_label.grid(column=0, row=5, stick='n')
+
+subject_entry = tk.Entry(root, font=base_font, width=30)
+
+subject_entry.grid(column=1, row=5, columnspan=2, stick='nw')
+
+# Hardcoded From, To & Subject
+
+from_entry.insert(tk.END, 'A simple peasant')
+
+to_entry.insert(tk.END, 'he11o.wrodb1in@gmail.com')
+
+subject_entry.insert(tk.END, 'We need you, Hero!')
+
+# Text Label & Entry
+
+text_label = tk.Label(root, text="Text:", background=bg_color, font=base_font)
+
+text_label.grid(column=0, row=6, stick='n')
+
+text_entry = tk.Text(root, font=base_font, width=40, height=6)
+
+text_entry.grid(column=0, row=7, columnspan=3, stick='nw', padx=30)
+
+# Attach File Button
+
+attach_btn = tk.Button(root, text="Attach file ..", command=lambda: callback(), font=(base_font, 10))
+
+attach_btn.grid(column=1, row=6, stick='n')
+
+# Send button
+
+send_btn = tk.Button(root, text="SEND", command=lambda: sent_email(), font=base_font)
+
+send_btn.grid(column=1, row=8, stick='nw', padx=50)
+ 
+#	Another beatifull line line_width = 440
+
+canvas.create_line(line_width, line_height, line_width, height)
+
+#	=================== Inbox Part
+
+#	Inbox Label
+
+inbox_title_label = tk.Label(root, text="Inbox", background=bg_color, font=(base_font, 20))
+
+inbox_title_label.grid(column=3, row=2, columnspan=2)
+
+# Inbox Textbox
+
+inbox_textbox = tk.Text(root, font=base_font, width=40, height=22,
+
+yscrollcommand=tk.Scrollbar(orient=tk.VERTICAL))
+
+inbox_textbox.grid(column=2, row=3, stick='ne', rowspan=7, columnspan=3)
+
+root.mainloop()
